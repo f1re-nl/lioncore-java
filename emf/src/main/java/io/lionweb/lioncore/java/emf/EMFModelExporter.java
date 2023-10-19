@@ -51,7 +51,9 @@ public class EMFModelExporter extends AbstractEMFExporter {
                 EAttribute eAttribute = (EAttribute) eStructuralFeature;
                 Object propertyValue = root.getPropertyValueByName(eAttribute.getName());
                 Object attributeValue = convertAttributeValue(propertyValue);
-                eObject.eSet(eAttribute, attributeValue);
+                if(attributeValue != null) {
+                  eObject.eSet(eAttribute, attributeValue);
+                }
               } else if (eStructuralFeature instanceof EReference) {
                 EReference eReference = (EReference) eStructuralFeature;
                 if (eReference.isContainment()) {
