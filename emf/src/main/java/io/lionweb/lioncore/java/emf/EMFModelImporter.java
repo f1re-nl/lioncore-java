@@ -3,6 +3,7 @@ package io.lionweb.lioncore.java.emf;
 import io.lionweb.lioncore.java.emf.mapping.ConceptsToEClassesMapping;
 import io.lionweb.lioncore.java.emf.support.NodeInstantiator;
 import io.lionweb.lioncore.java.language.*;
+import io.lionweb.lioncore.java.model.ClassifierInstanceUtils;
 import io.lionweb.lioncore.java.model.Node;
 import java.util.*;
 import org.eclipse.emf.ecore.*;
@@ -58,15 +59,18 @@ public class EMFModelImporter extends AbstractEMFImporter<Node> {
                     throw new UnsupportedOperationException();
                   }
                   if (eAttribute.getEAttributeType().equals(EcorePackage.eINSTANCE.getEInt())) {
-                    node.setPropertyValueByName(eStructuralFeature.getName(), sfValue);
+                    ClassifierInstanceUtils.setPropertyValueByName(
+                        node, eStructuralFeature.getName(), sfValue);
                   } else if (eAttribute
                       .getEAttributeType()
                       .equals(EcorePackage.eINSTANCE.getEString())) {
-                    node.setPropertyValueByName(eStructuralFeature.getName(), sfValue);
+                    ClassifierInstanceUtils.setPropertyValueByName(
+                        node, eStructuralFeature.getName(), sfValue);
                   } else if (eAttribute
                       .getEAttributeType()
                       .equals(EcorePackage.eINSTANCE.getEBoolean())) {
-                    node.setPropertyValueByName(eStructuralFeature.getName(), sfValue);
+                    ClassifierInstanceUtils.setPropertyValueByName(
+                        node, eStructuralFeature.getName(), sfValue);
                   } else {
                     throw new UnsupportedOperationException();
                   }
@@ -74,7 +78,7 @@ public class EMFModelImporter extends AbstractEMFImporter<Node> {
                   EReference eReference = (EReference) eStructuralFeature;
                   if (eReference.isContainment()) {
                     Containment containment =
-                        node.getConcept().requireContainmentByName(eStructuralFeature.getName());
+                        node.getClassifier().requireContainmentByName(eStructuralFeature.getName());
                     if (eReference.isMany()) {
                       List<EObject> values = (List<EObject>) sfValue;
                       values.forEach(

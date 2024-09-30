@@ -3,6 +3,7 @@ package io.lionweb.lioncore.java.emf;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
+import io.lionweb.lioncore.java.model.ClassifierInstanceUtils;
 import io.lionweb.lioncore.java.model.Node;
 import java.io.IOException;
 import java.io.InputStream;
@@ -54,30 +55,33 @@ public class EMFModelImporterTest {
     assertEquals(1, nodes.size());
 
     Node result = nodes.get(0);
-    assertEquals("Result", result.getConcept().getName());
+    assertEquals("Result", result.getClassifier().getName());
 
-    Node root = result.getOnlyChildByContainmentName("root");
+    Node root = ClassifierInstanceUtils.getOnlyChildByContainmentName(result, "root");
     assertNotNull(root);
 
-    Node rootPosition = root.getOnlyChildByContainmentName("position");
+    Node rootPosition = ClassifierInstanceUtils.getOnlyChildByContainmentName(root, "position");
     assertNotNull(rootPosition);
 
-    assertEquals("Position", rootPosition.getConcept().getName());
+    assertEquals("Position", rootPosition.getClassifier().getName());
 
-    Node rootPositionStart = rootPosition.getOnlyChildByContainmentName("start");
-    assertEquals(1, rootPositionStart.getPropertyValueByName("line"));
-    assertEquals(0, rootPositionStart.getPropertyValueByName("column"));
+    Node rootPositionStart =
+        ClassifierInstanceUtils.getOnlyChildByContainmentName(rootPosition, "start");
+    assertEquals(1, ClassifierInstanceUtils.getPropertyValueByName(rootPositionStart, "line"));
+    assertEquals(0, ClassifierInstanceUtils.getPropertyValueByName(rootPositionStart, "column"));
 
-    Node rootPositionEnd = rootPosition.getOnlyChildByContainmentName("end");
-    assertEquals(280, rootPositionEnd.getPropertyValueByName("line"));
-    assertEquals(0, rootPositionEnd.getPropertyValueByName("column"));
+    Node rootPositionEnd =
+        ClassifierInstanceUtils.getOnlyChildByContainmentName(rootPosition, "end");
+    assertEquals(280, ClassifierInstanceUtils.getPropertyValueByName(rootPositionEnd, "line"));
+    assertEquals(0, ClassifierInstanceUtils.getPropertyValueByName(rootPositionEnd, "column"));
 
-    Node rootElement = root.getOnlyChildByContainmentName("elements");
-    assertEquals("KClassDeclaration", rootElement.getConcept().getName());
-    assertEquals("KotlinPrinter", rootElement.getPropertyValueByName("name"));
+    Node rootElement = ClassifierInstanceUtils.getOnlyChildByContainmentName(root, "elements");
+    assertEquals("KClassDeclaration", rootElement.getClassifier().getName());
+    assertEquals(
+        "KotlinPrinter", ClassifierInstanceUtils.getPropertyValueByName(rootElement, "name"));
 
     Node rootElementPrimaryConstructor =
-        rootElement.getOnlyChildByContainmentName("primaryConstructor");
-    assertEquals("KPrimaryConstructor", rootElementPrimaryConstructor.getConcept().getName());
+        ClassifierInstanceUtils.getOnlyChildByContainmentName(rootElement, "primaryConstructor");
+    assertEquals("KPrimaryConstructor", rootElementPrimaryConstructor.getClassifier().getName());
   }
 }

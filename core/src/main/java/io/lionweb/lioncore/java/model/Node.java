@@ -2,6 +2,7 @@ package io.lionweb.lioncore.java.model;
 
 import io.lionweb.lioncore.java.language.*;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -27,23 +28,33 @@ public interface Node extends ClassifierInstance<Concept> {
   String getID();
 
   /**
-   * The Model in which the Node is contained. A Node is contained into a Model when it is a root
-   * node of that Node or if one of its ancestors is.
-   */
-  Model getModel();
-
-  /**
    * If a Node is a root node in a Model, this method returns the node itself. Otherwise it returns
    * the ancestor which is a root node. This method should return null only if the Node is not
    * inserted in a Model and it is therefore considered a dangling Node.
    */
-  Node getRoot();
+  default Node getRoot() {
+    List<Node> ancestors = new LinkedList<>();
+    Node curr = this;
+    while (curr != null) {
+      if (!ancestors.contains(curr)) {
+        ancestors.add(curr);
+        curr = (Node) curr.getParent();
+      } else {
+        throw new IllegalStateException("A circular hierarchy has been identified");
+      }
+    }
+    return ancestors.get(ancestors.size() - 1);
+  }
+
+  default boolean isRoot() {
+    return getParent() == null;
+  }
+
+  @Override
+  Node getParent();
 
   /** The concept of which this Node is an instance. The Concept should not be abstract. */
-  Concept getConcept();
-
-  /** Return all the annotations associated to this Node. */
-  List<AnnotationInstance> getAnnotations();
+  Concept getClassifier();
 
   /**
    * Return the Containment feature used to hold this Node within its parent. This will be null only
@@ -56,89 +67,15 @@ public interface Node extends ClassifierInstance<Concept> {
   Containment getContainmentFeature();
 
   /**
-   * Given a specific Annotation type it returns either the list of instances of that Annotation
-   * associated to the Node.
+   * Return a list containing this node and all its descendants. Does <i>not</i> include
+   * annotations.
    */
-  @Nonnull
-  List<AnnotationInstance> getAnnotations(Annotation annotation);
-
-  /**
-   * If an annotation instance was already associated under the Annotation link used by this
-   * AnnotationInstance, and the annotation does not support multiple values, then the existing
-   * instance will be removed and replaced by the instance specified in the call to this method.
-   *
-   * <p>In case the specified Annotation link cannot be used on Nodes of this Concept, then the
-   * exception IllegalArgumentException will be thrown.
-   */
-  void addAnnotation(AnnotationInstance instance);
-
-  default Object getPropertyValueByName(String propertyName) {
-    Property property = this.getConcept().getPropertyByName(propertyName);
-    if (property == null) {
-      throw new IllegalArgumentException(
-          "Concept "
-              + this.getConcept().qualifiedName()
-              + " does not contained a property named "
-              + propertyName);
-    }
-    return getPropertyValue(property);
-  }
-
-  default void setPropertyValueByName(String propertyName, Object value) {
-    Property property = this.getConcept().getPropertyByName(propertyName);
-    if (property == null) {
-      throw new IllegalArgumentException(
-          "Concept "
-              + this.getConcept().qualifiedName()
-              + " does not contained a property named "
-              + propertyName);
-    }
-    setPropertyValue(property, value);
-  }
-
-  default Object getPropertyValueByID(String propertyID) {
-    Property property = this.getConcept().getPropertyByID(propertyID);
-    return getPropertyValue(property);
-  }
-
-  /** Return a list containing this node and all its descendants. */
   default @Nonnull List<Node> thisAndAllDescendants() {
-    List<Node> nodes = new ArrayList<>();
-    nodes.add(this);
-    for (Node child : this.getChildren()) {
-      nodes.addAll(child.thisAndAllDescendants());
-    }
-    return nodes;
+    List<Node> result = new ArrayList<>();
+    ClassifierInstance.collectSelfAndDescendants(this, false, result);
+    return result;
   }
 
-  default List<? extends Node> getChildrenByContainmentName(String containmentName) {
-    return getChildren(getConcept().requireContainmentByName(containmentName));
-  }
+  // References methods
 
-  default @Nullable Node getOnlyChildByContainmentName(String containmentName) {
-    List<? extends Node> children = getChildrenByContainmentName(containmentName);
-    if (children.size() > 1) {
-      throw new IllegalStateException();
-    } else if (children.isEmpty()) {
-      return null;
-    } else {
-      return children.get(0);
-    }
-  }
-
-  default List<ReferenceValue> getReferenceValueByName(String referenceName) {
-    Reference reference = this.getConcept().getReferenceByName(referenceName);
-    if (reference == null) {
-      throw new IllegalArgumentException(
-          "Concept "
-              + this.getConcept().qualifiedName()
-              + " does not contained a property named "
-              + referenceName);
-    }
-    return getReferenceValues(reference);
-  }
-
-  default Classifier<Concept> getClassifier() {
-    return getConcept();
-  }
 }

@@ -1,5 +1,6 @@
 package io.lionweb.lioncore.java.self;
 
+import static io.lionweb.lioncore.java.serialization.SerializationProvider.getStandardJsonSerialization;
 import static org.junit.Assert.assertTrue;
 
 import io.lionweb.lioncore.java.language.Language;
@@ -15,22 +16,22 @@ import org.junit.Test;
 public class CorrespondanceWithDocumentationTest {
 
   private static final String SPECIFICATION_COMMIT_CONSIDERED =
-      "c956d3e1273f56e945e5de85a2eddb34bd5cb008";
+      "69ddbf4685acf1ef6d83c400570fb6c37efa4cfc";
 
   @Test
   public void lioncoreIsTheSameAsInTheOrganizationRepo() throws IOException {
-    JsonSerialization jsonSer = JsonSerialization.getStandardSerialization();
+    JsonSerialization jsonSer = getStandardJsonSerialization();
 
     URL url =
         new URL(
             "https://raw.githubusercontent.com/LionWeb-io/specification/"
                 + SPECIFICATION_COMMIT_CONSIDERED
                 + "/metametamodel/lioncore.json");
-    List<Node> nodes = jsonSer.unserializeToNodes(url);
+    List<Node> nodes = jsonSer.deserializeToNodes(url);
 
-    Language unserializedLioncore = (Language) nodes.get(0);
+    Language deserializedLioncore = (Language) nodes.get(0);
     ModelComparator.ComparisonResult comparison =
-        new ModelComparator().compare(unserializedLioncore, LionCore.getInstance());
+        new ModelComparator().compare(deserializedLioncore, LionCore.getInstance());
     System.out.println("Differences " + comparison.getDifferences().size());
     for (String difference : comparison.getDifferences()) {
       System.out.println(" - " + difference);
@@ -40,18 +41,18 @@ public class CorrespondanceWithDocumentationTest {
 
   @Test
   public void builtInIsTheSameAsInTheOrganizationRepo() throws IOException {
-    JsonSerialization jsonSer = JsonSerialization.getStandardSerialization();
+    JsonSerialization jsonSer = getStandardJsonSerialization();
 
     URL url =
         new URL(
             "https://raw.githubusercontent.com/LionWeb-io/specification/"
                 + SPECIFICATION_COMMIT_CONSIDERED
                 + "/metametamodel/builtins.json");
-    List<Node> nodes = jsonSer.unserializeToNodes(url);
+    List<Node> nodes = jsonSer.deserializeToNodes(url);
 
-    Language unserializedBuiltins = (Language) nodes.get(0);
+    Language deserializedBuiltins = (Language) nodes.get(0);
     ModelComparator.ComparisonResult comparison =
-        new ModelComparator().compare(unserializedBuiltins, LionCoreBuiltins.getInstance());
+        new ModelComparator().compare(deserializedBuiltins, LionCoreBuiltins.getInstance());
     System.out.println("Differences " + comparison.getDifferences().size());
     for (String difference : comparison.getDifferences()) {
       System.out.println(" - " + difference);

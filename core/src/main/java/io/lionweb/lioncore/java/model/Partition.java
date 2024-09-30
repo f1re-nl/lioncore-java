@@ -5,7 +5,8 @@ import io.lionweb.lioncore.java.language.Language;
 import java.util.List;
 
 /**
- * This represents a container of nodes.
+ * This represents a container of nodes. This idea was not retained. Partitions are now simple
+ * nodes, and this should be removed.
  *
  * @see org.eclipse.emf.ecore.resource.Resource Ecore equivalent <i>Resource</i>
  * @see <a href="https://www.jetbrains.com/help/mps/mps-project-structure.html#models">MPS
@@ -13,7 +14,8 @@ import java.util.List;
  *     <p>TODO consider if the Model should have a version too
  */
 @Experimental
-public interface Model {
+@Deprecated
+public interface Partition {
   /** Return the fully qualified name associated with the model. */
   String getName();
 
@@ -25,7 +27,7 @@ public interface Model {
    *
    * <p>TODO: consider versioning of models
    */
-  List<Model> getImportedModels();
+  List<Partition> getImportedModels();
 
   /**
    * Return the list of languages used by this model. All nodes contained in the Model could use

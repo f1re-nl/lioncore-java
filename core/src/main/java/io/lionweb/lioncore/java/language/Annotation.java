@@ -47,16 +47,16 @@ public class Annotation extends Classifier<Annotation> {
     setKey(key);
   }
 
-  public boolean isMultiple() {
-    return this.getPropertyValue("multiple", Boolean.class, false);
-  }
-
-  public void setMultiple(boolean value) {
-    this.setPropertyValue("multiple", value);
-  }
-
   public @Nullable Classifier<?> getAnnotates() {
-    Classifier<?> annotates = this.getReferenceSingleValue("annotates");
+    return this.getReferenceSingleValue("annotates");
+  }
+
+  /**
+   * An Annotation extending another annotation should not redefine annotates. So the value is
+   * effectively inherited from the super annotation.
+   */
+  public @Nullable Classifier<?> getEffectivelyAnnotated() {
+    Classifier<?> annotates = getAnnotates();
     if (annotates == null && getExtendedAnnotation() != null) {
       return getExtendedAnnotation().getAnnotates();
     } else {
@@ -108,19 +108,19 @@ public class Annotation extends Classifier<Annotation> {
 
   @Nonnull
   @Override
-  public List<Feature> inheritedFeatures() {
-    List<Feature> result = new LinkedList<>();
+  public List<Feature<?>> inheritedFeatures() {
+    List<Feature<?>> result = new LinkedList<>();
     if (this.getExtendedAnnotation() != null) {
-      result.addAll(this.getExtendedAnnotation().allFeatures());
+      combineFeatures(result, this.getExtendedAnnotation().allFeatures());
     }
     for (Interface superInterface : this.getImplemented()) {
-      result.addAll(superInterface.allFeatures());
+      combineFeatures(result, superInterface.allFeatures());
     }
     return result;
   }
 
   @Override
-  public Concept getConcept() {
+  public Concept getClassifier() {
     return LionCore.getAnnotation();
   }
 }

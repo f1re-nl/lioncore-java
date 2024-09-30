@@ -8,10 +8,12 @@ import java.io.FileReader;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
 
 /**
- * This class is responsible for handling serialization and unserialization from JSON and the
+ * This class is responsible for handling serialization and deserialization from JSON and the
  * low-level representation of models composed by SerializationBlock and the related classes.
  */
 public class LowLevelJsonSerialization {
@@ -26,14 +28,14 @@ public class LowLevelJsonSerialization {
    * <p>This method follows a "best-effort" approach, try to limit exception thrown and return data
    * whenever is possible, in the measure that it is possible.
    */
-  public SerializedChunk unserializeSerializationBlock(JsonElement jsonElement) {
+  public SerializedChunk deserializeSerializationBlock(JsonElement jsonElement) {
     SerializedChunk serializedChunk = new SerializedChunk();
     if (jsonElement.isJsonObject()) {
       JsonObject topLevel = jsonElement.getAsJsonObject();
       checkNoExtraKeys(topLevel, Arrays.asList("nodes", "serializationFormatVersion", "languages"));
       readSerializationFormatVersion(serializedChunk, topLevel);
       readLanguages(serializedChunk, topLevel);
-      unserializeClassifierInstances(serializedChunk, topLevel);
+      deserializeClassifierInstances(serializedChunk, topLevel);
       return serializedChunk;
     } else {
       throw new IllegalArgumentException(
@@ -51,8 +53,8 @@ public class LowLevelJsonSerialization {
    * <p>This method follows a "best-effort" approach, try to limit exception thrown and return data
    * whenever is possible, in the measure that it is possible.
    */
-  public SerializedChunk unserializeSerializationBlock(String json) {
-    return unserializeSerializationBlock(JsonParser.parseString(json));
+  public SerializedChunk deserializeSerializationBlock(String json) {
+    return deserializeSerializationBlock(JsonParser.parseString(json));
   }
 
   /**
@@ -65,8 +67,8 @@ public class LowLevelJsonSerialization {
    * <p>This method follows a "best-effort" approach, try to limit exception thrown and return data
    * whenever is possible, in the measure that it is possible.
    */
-  public SerializedChunk unserializeSerializationBlock(File file) throws FileNotFoundException {
-    return unserializeSerializationBlock(JsonParser.parseReader(new FileReader(file)));
+  public SerializedChunk deserializeSerializationBlock(File file) throws FileNotFoundException {
+    return deserializeSerializationBlock(JsonParser.parseReader(new FileReader(file)));
   }
 
   public JsonElement serializeToJsonElement(SerializedChunk serializedChunk) {
@@ -83,6 +85,8 @@ public class LowLevelJsonSerialization {
       JsonObject nodeJson = new JsonObject();
       nodeJson.addProperty("id", node.getID());
 
+      nodeJson.add("classifier", serializeToJsonElement(node.getClassifier()));
+
       JsonArray properties = new JsonArray();
       for (SerializedPropertyValue propertyValue : node.getProperties()) {
         JsonObject property = new JsonObject();
@@ -92,14 +96,14 @@ public class LowLevelJsonSerialization {
       }
       nodeJson.add("properties", properties);
 
-      JsonArray children = new JsonArray();
+      JsonArray containments = new JsonArray();
       for (SerializedContainmentValue childrenValue : node.getContainments()) {
-        JsonObject childrenJ = new JsonObject();
-        childrenJ.add("containment", serializeToJsonElement(childrenValue.getMetaPointer()));
-        childrenJ.add("children", SerializationUtils.toJsonArray(childrenValue.getValue()));
-        children.add(childrenJ);
+        JsonObject children = new JsonObject();
+        children.add("containment", serializeToJsonElement(childrenValue.getMetaPointer()));
+        children.add("children", SerializationUtils.toJsonArray(childrenValue.getValue()));
+        containments.add(children);
       }
-      nodeJson.add("children", children);
+      nodeJson.add("containments", containments);
 
       JsonArray references = new JsonArray();
       for (SerializedReferenceValue referenceValue : node.getReferences()) {
@@ -117,18 +121,7 @@ public class LowLevelJsonSerialization {
       }
       nodeJson.add("annotations", annotations);
 
-      if (node instanceof SerializedNodeInstance) {
-        SerializedNodeInstance serializedNodeInstance = (SerializedNodeInstance) node;
-        nodeJson.addProperty("parent", serializedNodeInstance.getParentNodeID());
-        nodeJson.add("classifier", serializeToJsonElement(node.getClassifier()));
-      } else if (node instanceof SerializedAnnotationInstance) {
-        SerializedAnnotationInstance serializedAnnotationInstance =
-            (SerializedAnnotationInstance) node;
-        nodeJson.addProperty("annotated", serializedAnnotationInstance.getParentNodeID());
-        nodeJson.add("annotation", serializeToJsonElement(node.getClassifier()));
-      } else {
-        throw new UnsupportedOperationException();
-      }
+      nodeJson.addProperty("parent", node.getParentNodeID());
 
       nodes.add(nodeJson);
     }
@@ -187,7 +180,7 @@ public class LowLevelJsonSerialization {
                   }
                   serializedChunk.addLanguage(languageKeyVersion);
                 } catch (Exception e) {
-                  throw new RuntimeException("Issue while unserializing " + element, e);
+                  throw new RuntimeException("Issue while deserializing " + element, e);
                 }
               });
     } else {
@@ -196,7 +189,7 @@ public class LowLevelJsonSerialization {
     }
   }
 
-  private void unserializeClassifierInstances(
+  private void deserializeClassifierInstances(
       SerializedChunk serializedChunk, JsonObject topLevel) {
     if (!topLevel.has("nodes")) {
       throw new IllegalArgumentException("nodes not specified");
@@ -206,13 +199,13 @@ public class LowLevelJsonSerialization {
           .forEach(
               element -> {
                 try {
-                  SerializedClassifierInstance instance = unserializeClassifierInstance(element);
+                  SerializedClassifierInstance instance = deserializeClassifierInstance(element);
                   serializedChunk.addClassifierInstance(instance);
-                } catch (UnserializationException e) {
-                  throw new UnserializationException(
-                      "Issue while unserializing classifier instances", e);
+                } catch (DeserializationException e) {
+                  throw new DeserializationException(
+                      "Issue while deserializing classifier instances", e);
                 } catch (Exception e) {
-                  throw new RuntimeException("Issue while unserializing " + element, e);
+                  throw new RuntimeException("Issue while deserializing " + element, e);
                 }
               });
     } else {
@@ -231,13 +224,13 @@ public class LowLevelJsonSerialization {
 
   private JsonElement serializeToJsonElement(UsedLanguage languageKeyVersion) {
     JsonObject jsonObject = new JsonObject();
-    jsonObject.addProperty("version", languageKeyVersion.getVersion());
     jsonObject.addProperty("key", languageKeyVersion.getKey());
+    jsonObject.addProperty("version", languageKeyVersion.getVersion());
     return jsonObject;
   }
 
   @Nullable
-  private SerializedClassifierInstance unserializeClassifierInstance(JsonElement jsonElement) {
+  private SerializedClassifierInstance deserializeClassifierInstance(JsonElement jsonElement) {
     if (!jsonElement.isJsonObject()) {
       throw new IllegalArgumentException(
           "Malformed JSON. Object expected but found " + jsonElement);
@@ -245,27 +238,12 @@ public class LowLevelJsonSerialization {
     try {
       JsonObject jsonObject = jsonElement.getAsJsonObject();
 
-      SerializedClassifierInstance serializedClassifierInstance;
-      if (jsonObject.has("parent") || jsonObject.has("classifier")) {
-        SerializedNodeInstance serializedNodeInstance = new SerializedNodeInstance();
-        serializedNodeInstance.setClassifier(
-            SerializationUtils.tryToGetMetaPointerProperty(jsonObject, "classifier"));
-        serializedNodeInstance.setParentNodeID(
-            SerializationUtils.tryToGetStringProperty(jsonObject, "parent"));
-        serializedClassifierInstance = serializedNodeInstance;
-      } else if (jsonObject.has("annotated") || jsonObject.has("annotation")) {
-        SerializedAnnotationInstance serializedAnnotationInstance =
-            new SerializedAnnotationInstance();
-        serializedAnnotationInstance.setClassifier(
-            SerializationUtils.tryToGetMetaPointerProperty(jsonObject, "annotation"));
-        serializedAnnotationInstance.setParentNodeID(
-            SerializationUtils.tryToGetStringProperty(jsonObject, "annotated"));
-        serializedClassifierInstance = serializedAnnotationInstance;
-      } else {
-        throw new UnsupportedOperationException(
-            "Classifier instance which does not look like a node or an annotation instance: "
-                + jsonObject);
-      }
+      SerializedClassifierInstance serializedClassifierInstance =
+          new SerializedClassifierInstance();
+      serializedClassifierInstance.setClassifier(
+          SerializationUtils.tryToGetMetaPointerProperty(jsonObject, "classifier"));
+      serializedClassifierInstance.setParentNodeID(
+          SerializationUtils.tryToGetStringProperty(jsonObject, "parent"));
 
       serializedClassifierInstance.setID(
           SerializationUtils.tryToGetStringProperty(jsonObject, "id"));
@@ -280,14 +258,23 @@ public class LowLevelJsonSerialization {
                     SerializationUtils.tryToGetStringProperty(propertyJO, "value")));
           });
 
-      JsonArray children = jsonObject.get("children").getAsJsonArray();
-      children.forEach(
-          childrenEntry -> {
-            JsonObject childrenJO = childrenEntry.getAsJsonObject();
+      JsonArray containments;
+      if (jsonObject.has("children")) {
+        containments = jsonObject.get("children").getAsJsonArray();
+      } else if (jsonObject.has("containments")) {
+        containments = jsonObject.get("containments").getAsJsonArray();
+      } else {
+        throw new UnsupportedOperationException(
+            "Node is missing containments entry: " + jsonObject);
+      }
+
+      containments.forEach(
+          containmentEntry -> {
+            JsonObject containmentJO = containmentEntry.getAsJsonObject();
             serializedClassifierInstance.addContainmentValue(
                 new SerializedContainmentValue(
-                    SerializationUtils.tryToGetMetaPointerProperty(childrenJO, "containment"),
-                    SerializationUtils.tryToGetArrayOfIDs(childrenJO, "children")));
+                    SerializationUtils.tryToGetMetaPointerProperty(containmentJO, "containment"),
+                    SerializationUtils.tryToGetArrayOfIDs(containmentJO, "children")));
           });
 
       JsonArray references = jsonObject.get("references").getAsJsonArray();
@@ -300,9 +287,22 @@ public class LowLevelJsonSerialization {
                     SerializationUtils.tryToGetArrayOfReferencesProperty(referenceJO, "targets")));
           });
 
+      JsonElement annotationsJE = jsonObject.get("annotations");
+      if (annotationsJE != null) {
+        JsonArray annotations = annotationsJE.getAsJsonArray();
+        serializedClassifierInstance.setAnnotations(
+            StreamSupport.stream(annotations.spliterator(), false)
+                .map(
+                    annotationEntry -> {
+                      JsonPrimitive annotationJP = annotationEntry.getAsJsonPrimitive();
+                      return annotationJP.getAsString();
+                    })
+                .collect(Collectors.toList()));
+      }
+
       return serializedClassifierInstance;
-    } catch (UnserializationException e) {
-      throw new UnserializationException("Issue occurred while unserializing " + jsonElement, e);
+    } catch (DeserializationException e) {
+      throw new DeserializationException("Issue occurred while deserializing " + jsonElement, e);
     }
   }
 

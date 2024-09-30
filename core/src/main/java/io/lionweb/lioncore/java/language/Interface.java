@@ -63,16 +63,16 @@ public class Interface extends Classifier<Interface> {
 
   @Nonnull
   @Override
-  public List<Feature> inheritedFeatures() {
-    List<Feature> result = new LinkedList<>();
-    for (Interface superInterface : getExtendedInterfaces()) {
-      result.addAll(superInterface.allFeatures());
+  public List<Feature<?>> inheritedFeatures() {
+    List<Feature<?>> result = new LinkedList<>();
+    for (Classifier<?> superInterface : allAncestors()) {
+      combineFeatures(result, superInterface.allFeatures());
     }
     return result;
   }
 
   @Override
-  public Concept getConcept() {
+  public Concept getClassifier() {
     return LionCore.getInterface();
   }
 

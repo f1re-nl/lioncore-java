@@ -2,6 +2,7 @@ package io.lionweb.lioncore.java.emf;
 
 import io.lionweb.lioncore.java.emf.mapping.ConceptsToEClassesMapping;
 import io.lionweb.lioncore.java.language.Reference;
+import io.lionweb.lioncore.java.model.ClassifierInstanceUtils;
 import io.lionweb.lioncore.java.model.Node;
 import io.lionweb.lioncore.java.model.ReferenceValue;
 import java.util.*;
@@ -35,9 +36,13 @@ public class EMFModelExporter extends AbstractEMFExporter {
 
   /** This export the root received to a single EObject tree. */
   public EObject exportTree(Node root, ReferencesPostponer referencesPostponer) {
-    EClass eClass = (EClass) conceptsToEClassesMapping.getCorrespondingEClass(root.getConcept());
+    EClass eClass = (EClass) conceptsToEClassesMapping.getCorrespondingEClass(root.getClassifier());
     if (eClass == null) {
-      throw new IllegalStateException();
+      throw new IllegalStateException(
+          "Cannot find EClass corresponding to "
+              + root.getClassifier().getName()
+              + ". Node: "
+              + root);
     }
     EObject eObject = eClass.getEPackage().getEFactoryInstance().create(eClass);
     referencesPostponer.trackMapping(root, eObject);
@@ -49,7 +54,8 @@ public class EMFModelExporter extends AbstractEMFExporter {
             eStructuralFeature -> {
               if (eStructuralFeature instanceof EAttribute) {
                 EAttribute eAttribute = (EAttribute) eStructuralFeature;
-                Object propertyValue = root.getPropertyValueByName(eAttribute.getName());
+                Object propertyValue =
+                    ClassifierInstanceUtils.getPropertyValueByName(root, eAttribute.getName());
                 Object attributeValue = convertAttributeValue(propertyValue);
                 if(attributeValue != null) {
                   eObject.eSet(eAttribute, attributeValue);
@@ -59,20 +65,41 @@ public class EMFModelExporter extends AbstractEMFExporter {
                 if (eReference.isContainment()) {
                   if (eReference.isMany()) {
                     List<? extends Node> childrenInLW =
-                        root.getChildrenByContainmentName(eReference.getName());
+                        ClassifierInstanceUtils.getChildrenByContainmentName(
+                            root, eReference.getName());
                     List<EObject> childrenInEmf =
                         childrenInLW.stream()
                             .map(clw -> exportTree(clw, referencesPostponer))
                             .collect(Collectors.toList());
                     eObject.eSet(eReference, childrenInEmf);
                   } else {
-                    throw new UnsupportedOperationException();
+                    List<? extends Node> childrenInLW =
+                        ClassifierInstanceUtils.getChildrenByContainmentName(
+                            root, eReference.getName());
+                    if (childrenInLW.size() > 1) {
+                      throw new IllegalStateException(
+                          "More than one child found in eReference "
+                              + eReference.getEContainingClass().getName()
+                              + "."
+                              + eReference.getName()
+                              + ", where up to one children was expected, "
+                              + "as the relation has not multiplicity many");
+                    } else if (childrenInLW.size() == 1) {
+                      eObject.eSet(
+                          eReference, exportTree(childrenInLW.get(0), referencesPostponer));
+                    } else {
+                      eObject.eSet(eReference, null);
+                    }
                   }
                 } else {
                   referencesPostponer.recordReference(root, eObject, eReference);
                 }
               } else {
-                throw new IllegalStateException();
+                throw new IllegalStateException(
+                    "Unexpected feature "
+                        + eStructuralFeature.getClass()
+                        + ". Instance: "
+                        + eStructuralFeature.getName());
               }
             });
 
@@ -104,7 +131,7 @@ public class EMFModelExporter extends AbstractEMFExporter {
             Reference reference =
                 postponedReference
                     .node
-                    .getConcept()
+                    .getClassifier()
                     .getReferenceByName(postponedReference.eReference.getName());
             List<ReferenceValue> referenceValues =
                 postponedReference.node.getReferenceValues(reference);
@@ -121,7 +148,13 @@ public class EMFModelExporter extends AbstractEMFExporter {
               } else if (referenceValues.size() == 1) {
                 referredEObject = nodeToEObject(referenceValues.get(0).getReferred());
               } else {
-                throw new IllegalStateException();
+                throw new IllegalStateException(
+                    "More than one reference found in reference "
+                        + reference.getContainmentFeature().getName()
+                        + "."
+                        + reference.getName()
+                        + ", where up to one reference was expected, "
+                        + "as the relation has not multiplicity many");
               }
 
               postponedReference.eObject.eSet(postponedReference.eReference, referredEObject);

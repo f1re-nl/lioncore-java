@@ -8,6 +8,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.lionweb.lioncore.java.language.Concept;
 import io.lionweb.lioncore.java.language.Property;
+import io.lionweb.lioncore.java.model.ClassifierInstanceUtils;
 import io.lionweb.lioncore.java.model.Node;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -18,29 +19,31 @@ import org.junit.Test;
 public class SerializationOfLibraryTest extends SerializationTest {
 
   @Test
-  public void unserializeLibraryToConcreteClasses() {
+  public void deserializeLibraryToConcreteClasses() {
     InputStream inputStream =
         this.getClass().getResourceAsStream("/serialization/library-language.json");
     JsonElement jsonElement = JsonParser.parseReader(new InputStreamReader(inputStream));
-    JsonSerialization jsonSerialization = JsonSerialization.getStandardSerialization();
-    List<Node> unserializedNodes = jsonSerialization.unserializeToNodes(jsonElement);
+    JsonSerialization jsonSerialization = SerializationProvider.getStandardJsonSerialization();
+    List<Node> deserializedNodes = jsonSerialization.deserializeToNodes(jsonElement);
 
-    Concept library = conceptByID(unserializedNodes, "library-Library");
+    Concept library = conceptByID(deserializedNodes, "library-Library");
     Property libraryName = library.getPropertyByName("name");
     assertNotNull(libraryName.getKey());
 
     Node book =
-        unserializedNodes.stream().filter(n -> n.getID().equals("library-Book")).findFirst().get();
-    assertEquals("Book", book.getPropertyValueByName("name"));
-    assertEquals("library-Book", book.getPropertyValueByName("key"));
+        deserializedNodes.stream().filter(n -> n.getID().equals("library-Book")).findFirst().get();
+    assertEquals("Book", ClassifierInstanceUtils.getPropertyValueByName(book, "name"));
+    assertEquals("library-Book", ClassifierInstanceUtils.getPropertyValueByName(book, "key"));
 
     Concept guidedBookWriter =
         (Concept)
-            unserializedNodes.stream()
+            deserializedNodes.stream()
                 .filter(n -> n.getID().equals("library-GuideBookWriter"))
                 .findFirst()
                 .get();
-    assertEquals("GuideBookWriter", guidedBookWriter.getPropertyValueByName("name"));
+    assertEquals(
+        "GuideBookWriter",
+        ClassifierInstanceUtils.getPropertyValueByName(guidedBookWriter, "name"));
     assertNotNull(guidedBookWriter.getExtendedConcept());
   }
 
@@ -49,10 +52,10 @@ public class SerializationOfLibraryTest extends SerializationTest {
     InputStream inputStream =
         this.getClass().getResourceAsStream("/serialization/library-language.json");
     JsonElement jsonElement = JsonParser.parseReader(new InputStreamReader(inputStream));
-    JsonSerialization jsonSerialization = JsonSerialization.getStandardSerialization();
-    List<Node> unserializedNodes = jsonSerialization.unserializeToNodes(jsonElement);
+    JsonSerialization jsonSerialization = SerializationProvider.getStandardJsonSerialization();
+    List<Node> deserializedNodes = jsonSerialization.deserializeToNodes(jsonElement);
     JsonElement reserialized =
-        jsonSerialization.serializeTreeToJsonElement(unserializedNodes.get(0));
+        jsonSerialization.serializeTreeToJsonElement(deserializedNodes.get(0));
     SerializedJsonComparisonUtils.assertEquivalentLionWebJson(
         jsonElement.getAsJsonObject(), reserialized.getAsJsonObject());
   }
@@ -70,7 +73,7 @@ public class SerializationOfLibraryTest extends SerializationTest {
     // The library MM is not using the standard primitive types but its own, so we need to specify
     // how to serialize
     // those values
-    JsonSerialization jsonSerialization = JsonSerialization.getStandardSerialization();
+    JsonSerialization jsonSerialization = SerializationProvider.getStandardJsonSerialization();
     jsonSerialization
         .getPrimitiveValuesSerialization()
         .registerSerializer(
@@ -91,10 +94,10 @@ public class SerializationOfLibraryTest extends SerializationTest {
   }
 
   @Test(expected = IllegalStateException.class)
-  public void unserializeLanguageWithDuplicateIDs() {
+  public void deserializeLanguageWithDuplicateIDs() {
     InputStream inputStream =
         this.getClass().getResourceAsStream("/serialization/library-language-with-duplicate.json");
-    JsonSerialization jsonSerialization = JsonSerialization.getStandardSerialization();
-    jsonSerialization.unserializeToNodes(inputStream);
+    JsonSerialization jsonSerialization = SerializationProvider.getStandardJsonSerialization();
+    jsonSerialization.deserializeToNodes(inputStream);
   }
 }

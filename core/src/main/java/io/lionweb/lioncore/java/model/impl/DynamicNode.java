@@ -1,32 +1,34 @@
 package io.lionweb.lioncore.java.model.impl;
 
 import io.lionweb.lioncore.java.language.*;
-import io.lionweb.lioncore.java.model.Model;
+import io.lionweb.lioncore.java.model.HasSettableParent;
 import io.lionweb.lioncore.java.model.Node;
 import java.util.*;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * DynamicNode can be used to represent Node of any Concept. The drawback is that this class expose
  * only homogeneous-APIs (e.g., getProperty('book')) and not heterogeneous-APIs (e.g., getBook()).
  */
-public class DynamicNode extends DynamicClassifierInstance<Concept> implements Node {
+public class DynamicNode extends DynamicClassifierInstance<Concept>
+    implements Node, HasSettableParent {
   private Node parent = null;
   private Concept concept = null;
 
-  public DynamicNode(String id, Concept concept) {
+  public DynamicNode(@Nonnull String id, @Nonnull Concept concept) {
     this.id = id;
     this.concept = concept;
   }
 
-  @Override
-  public Model getModel() {
-    throw new UnsupportedOperationException();
+  public DynamicNode() {
+    this.id = null;
+    this.concept = null;
   }
 
-  @Override
-  public Node getRoot() {
-    throw new UnsupportedOperationException();
+  public void setConcept(Concept concept) {
+    this.concept = concept;
   }
 
   @Override
@@ -35,15 +37,25 @@ public class DynamicNode extends DynamicClassifierInstance<Concept> implements N
   }
 
   @Override
-  public Concept getConcept() {
+  public Concept getClassifier() {
     return this.concept;
   }
 
   @Override
+  @Nullable
   public Containment getContainmentFeature() {
-    throw new UnsupportedOperationException();
+    if (parent == null) {
+      return null;
+    }
+    for (Containment containment : parent.getClassifier().allContainments()) {
+      if (parent.getChildren(containment).stream().anyMatch(it -> it == this)) {
+        return containment;
+      }
+    }
+    throw new IllegalStateException("Unable to find the containment feature");
   }
 
+  @Override
   public void setParent(Node parent) {
     this.parent = parent;
   }

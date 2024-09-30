@@ -1,21 +1,20 @@
 package io.lionweb.lioncore.java.serialization;
 
-import io.lionweb.lioncore.java.language.Annotation;
+import io.lionweb.lioncore.java.language.Concept;
 import io.lionweb.lioncore.java.language.Containment;
 import io.lionweb.lioncore.java.language.Property;
 import io.lionweb.lioncore.java.language.Reference;
 import io.lionweb.lioncore.java.model.AnnotationInstance;
-import io.lionweb.lioncore.java.model.Model;
 import io.lionweb.lioncore.java.model.Node;
 import io.lionweb.lioncore.java.model.ReferenceValue;
+import io.lionweb.lioncore.java.model.impl.AbstractClassifierInstance;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-public abstract class SimpleNode implements Node {
+public abstract class SimpleNode extends AbstractClassifierInstance<Concept> implements Node {
 
   private String id;
   private Node parent;
@@ -41,11 +40,6 @@ public abstract class SimpleNode implements Node {
   }
 
   @Override
-  public Model getModel() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public Node getParent() {
     return parent;
   }
@@ -60,35 +54,9 @@ public abstract class SimpleNode implements Node {
     throw new UnsupportedOperationException();
   }
 
-  @Nonnull
-  @Override
-  public List<AnnotationInstance> getAnnotations(Annotation annotation) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void addAnnotation(AnnotationInstance instance) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public Object getPropertyValueByName(String propertyName) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void setPropertyValueByName(String propertyName, Object value) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public Object getPropertyValueByID(String propertyID) {
-    throw new UnsupportedOperationException();
-  }
-
   @Override
   public Object getPropertyValue(Property property) {
-    if (!getConcept().allProperties().contains(property)) {
+    if (!getClassifier().allProperties().contains(property)) {
       throw new IllegalArgumentException("Property not belonging to this concept");
     }
     return concreteGetPropertyValue(property);
@@ -105,7 +73,7 @@ public abstract class SimpleNode implements Node {
 
   @Override
   public List<? extends Node> getChildren(Containment containment) {
-    if (!getConcept().allContainments().contains(containment)) {
+    if (!getClassifier().allContainments().contains(containment)) {
       throw new IllegalArgumentException("Containment not belonging to this concept");
     }
     return concreteGetChildren(containment);
@@ -127,14 +95,8 @@ public abstract class SimpleNode implements Node {
 
   @Nonnull
   @Override
-  public List<Node> getReferredNodes(@Nonnull Reference reference) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Nonnull
-  @Override
   public List<ReferenceValue> getReferenceValues(@Nonnull Reference reference) {
-    if (!getConcept().allReferences().contains(reference)) {
+    if (!getClassifier().allReferences().contains(reference)) {
       throw new IllegalArgumentException("Reference not belonging to this concept");
     }
     return concreteGetReferenceValues(reference);
@@ -147,7 +109,7 @@ public abstract class SimpleNode implements Node {
   @Override
   public void addReferenceValue(
       @Nonnull Reference reference, @Nullable ReferenceValue referredNode) {
-    if (!getConcept().allReferences().contains(reference)) {
+    if (!getClassifier().allReferences().contains(reference)) {
       throw new IllegalArgumentException("Reference not belonging to this concept");
     }
     concreteAddReferenceValue(reference, referredNode);
@@ -164,11 +126,24 @@ public abstract class SimpleNode implements Node {
   }
 
   @Override
-  public List<Node> getChildren() {
-    List<Node> allChildren = new LinkedList<>();
-    getConcept().allContainments().stream()
-        .map(c -> getChildren(c))
-        .forEach(children -> allChildren.addAll(children));
-    return allChildren;
+  public void removeChild(@Nonnull Containment containment, int index) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void removeReferenceValue(
+      @Nonnull Reference reference, @Nullable ReferenceValue referenceValue) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void removeReferenceValue(@Nonnull Reference reference, int index) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void setReferenceValues(
+      @Nonnull Reference reference, @Nonnull List<? extends ReferenceValue> values) {
+    throw new UnsupportedOperationException();
   }
 }

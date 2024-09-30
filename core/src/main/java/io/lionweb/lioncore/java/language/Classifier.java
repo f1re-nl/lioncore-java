@@ -51,7 +51,7 @@ public abstract class Classifier<T extends M3Node> extends LanguageEntity<T>
    * @return All direct or indirect/transitive ancestors.
    */
   public @Nonnull Set<Classifier<?>> allAncestors() {
-    Set<Classifier<?>> result = new HashSet<>();
+    Set<Classifier<?>> result = new LinkedHashSet<>();
     Set<Classifier<?>> ancestors = new HashSet<>(directAncestors());
 
     while (!ancestors.isEmpty()) {
@@ -66,16 +66,17 @@ public abstract class Classifier<T extends M3Node> extends LanguageEntity<T>
     return result;
   }
 
-  public @Nonnull List<Feature> allFeatures() {
+  public @Nonnull List<Feature<?>> allFeatures() {
     // TODO Should this return features which are overriden?
     // TODO Should features be returned in a particular order?
-    List<Feature> result = new LinkedList<>();
+    List<Feature<?>> result = new LinkedList<>();
     result.addAll(this.getFeatures());
-    result.addAll(this.inheritedFeatures());
+    combineFeatures(result, this.inheritedFeatures());
+
     return result;
   }
 
-  public abstract @Nonnull List<Feature> inheritedFeatures();
+  public abstract @Nonnull List<Feature<?>> inheritedFeatures();
 
   public @Nonnull List<Property> allProperties() {
     return allFeatures().stream()
@@ -98,9 +99,16 @@ public abstract class Classifier<T extends M3Node> extends LanguageEntity<T>
         .collect(Collectors.toList());
   }
 
+  public @Nonnull List<Link<?>> allLinks() {
+    return allFeatures().stream()
+        .filter(f -> f instanceof Link)
+        .map(f -> (Link<?>) f)
+        .collect(Collectors.toList());
+  }
+
   // TODO should this expose an immutable list to force users to use methods on this class
   //      to modify the collection?
-  public @Nonnull List<Feature> getFeatures() {
+  public @Nonnull List<Feature<?>> getFeatures() {
     return this.getContainmentMultipleValue("features");
   }
 
@@ -180,9 +188,18 @@ public abstract class Classifier<T extends M3Node> extends LanguageEntity<T>
     Containment containment = getContainmentByName(containmentName);
     if (containment == null) {
       throw new IllegalArgumentException(
-          "Containment " + containmentName + " not found in Concept " + getName());
+          "Containment " + containmentName + " not found in Classifier " + getName());
     }
     return containment;
+  }
+
+  public @Nonnull Reference requireReferenceByName(@Nonnull String referenceName) {
+    Reference reference = getReferenceByName(referenceName);
+    if (reference == null) {
+      throw new IllegalArgumentException(
+          "Reference " + referenceName + " not found in Classifier " + getName());
+    }
+    return reference;
   }
 
   public @Nullable Link getLinkByName(@Nonnull String linkName) {
@@ -215,5 +232,19 @@ public abstract class Classifier<T extends M3Node> extends LanguageEntity<T>
         .filter(p -> MetaPointer.from(p).equals(metaPointer))
         .findFirst()
         .orElse(null);
+  }
+
+  protected void combineFeatures(List<Feature<?>> featuresA, List<Feature<?>> featuresB) {
+    Set<MetaPointer> existingMetapointers = new HashSet<>();
+    for (Feature<?> f : featuresA) {
+      existingMetapointers.add(MetaPointer.from(f));
+    }
+    for (Feature<?> f : featuresB) {
+      MetaPointer metaPointer = MetaPointer.from(f);
+      if (!existingMetapointers.contains(metaPointer)) {
+        existingMetapointers.add(metaPointer);
+        featuresA.add(f);
+      }
+    }
   }
 }

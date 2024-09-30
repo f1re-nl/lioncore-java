@@ -1,0 +1,163 @@
+import com.vanniktech.maven.publish.SonatypeHost
+import org.apache.tools.ant.taskdefs.condition.Os
+
+plugins {
+    id 'java-library'
+    id("com.vanniktech.maven.publish")
+    id "eclipse"
+    id 'signing'
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+configurations {
+    mwe2.extendsFrom compileClasspath
+}
+
+dependencies {
+    api emf.common
+    api emf.ecore
+    api emf.ecore.xmi
+    api("org.eclipse.emf:org.eclipse.emf.mwe2.launch:$mwe2LaunchVersion")
+    api("org.eclipse.xtext:org.eclipse.xtext.common.types:$xtextVersion")
+    api("org.eclipse.xtext:org.eclipse.xtext.xtext.generator:$xtextVersion")
+    mwe2("org.eclipse.emf:org.eclipse.emf.mwe2.launch:$mwe2LaunchVersion")
+    mwe2("org.eclipse.xtext:org.eclipse.xtext.common.types:$xtextVersion")
+    mwe2("org.eclipse.xtext:org.eclipse.xtext.xtext.generator:$xtextVersion")
+}
+
+// generateXtextLanguage gets unhappy about files it finds in `build/resources` if we re-run without a clean.
+tasks.register("cleanGeneratedEcore") {
+    doLast {
+        delete(new File(project.buildDir, "resources"))
+    }
+}
+
+tasks.register("generateXtextLanguage", JavaExec) {
+    mainClass.set("org.eclipse.emf.mwe2.launch.runtime.Mwe2Launcher")
+    classpath = configurations.mwe2
+    args = args?.plus("src/main/java/io/lionweb/java/emf/builtins/GenerateBuiltins.mwe2")
+    args = args?.plus("-p")
+    args = args?.plus("rootPath=/${projectDir}")
+}
+
+tasks.generateXtextLanguage.dependsOn("cleanGeneratedEcore")
+
+tasks.compileJava.dependsOn("generateXtextLanguage")
+tasks.processResources.dependsOn("generateXtextLanguage")
+tasks.clean.dependsOn("cleanGenerateXtextLanguage")
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(JavaVersion.toVersion("${jvmVersion}").getMajorVersion())
+    }
+}
+
+jar {
+    manifest {
+        attributes(
+                "Manifest-Version": "1.0",
+                "Bundle-ManifestVersion": "2",
+                "Bundle-Name": "emf-builtins",
+                "Bundle-SymbolicName": "io.lionweb.java.emf.builtins;singleton:=true",
+                "Bundle-Version": "${version}.qualifier",
+                "Require-Bundle": "org.eclipse.emf.ecore"
+        )
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs([
+                    "${projectDir}/src-gen/main/java",
+                    "${projectDir}/src/main/java"
+            ])
+        }
+        resources {
+            srcDirs([
+                    "${projectDir}/src/main/resources",
+                    "${projectDir}/src/main/model"
+            ])
+        }
+    }
+}
+
+processResources {
+    from(".project")
+    from(".classpath")
+    from("build.properties")
+    from("plugin.properties")
+    from("plugin.xml")
+}
+
+var isReleaseVersion = !(version as String).endsWith("SNAPSHOT")
+
+task javadocJar(type: Jar) {
+    archiveClassifier.set("javadoc")
+}
+
+task sourcesJar(type: Jar) {
+    archiveClassifier.set("sources")
+    // See https://discuss.gradle.org/t/why-subproject-sourceset-dirs-project-sourceset-dirs/7376/5
+    // Without the closure, parent sources are used for children too
+    from(sourceSets.getByName("main").java.srcDirs)
+}
+
+mavenPublishing {
+    coordinates(
+        "io.lionweb.lionweb-java",
+        "lionweb-java-${specsVersion}-" + project.name,
+        project.version as String,
+    )
+
+    pom {
+        name.set("lionweb-java-" + project.name)
+        description.set("Builtins EPackage for EMF compatibility layer for LionWeb")
+        version = project.version as String
+        packaging = "jar"
+        url.set("https://github.com/LionWeb-io/lionweb-java")
+
+        scm {
+            connection.set("scm:git:https://github.com/LionWeb-io/lionweb-java.git")
+            developerConnection.set("scm:git:git@github.com:LionWeb-io/lionweb-java.git")
+            url.set("https://github.com/LionWeb-io/lionweb-java.git")
+        }
+
+        licenses {
+            license {
+                name.set("Apache Licenve V2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0")
+                distribution.set("repo")
+            }
+        }
+
+        // The developers entry is strictly required by Maven Central
+        developers {
+            developer {
+                id.set("ftomassetti")
+                name.set("Federico Tomassetti")
+                email.set("federico@strumenta.com")
+            }
+            developer {
+                id.set("dslmeinte")
+                name.set("Meinte Boersma")
+                email.set("meinte.boersma@gmail.com")
+            }
+            developer {
+                id.set("enikao")
+                name.set("Niko Stotz")
+                email.set("github-public@nikostotz.de")
+            }
+        }
+    }
+    publishToMavenCentral(SonatypeHost.S01, true)
+    signAllPublications()
+}
+
+task setup() {
+    dependsOn("generateXtextLanguage")
+}

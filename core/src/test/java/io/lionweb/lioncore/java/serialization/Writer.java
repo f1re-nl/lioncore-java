@@ -1,6 +1,7 @@
 package io.lionweb.lioncore.java.serialization;
 
 import io.lionweb.lioncore.java.language.Concept;
+import io.lionweb.lioncore.java.model.ClassifierInstanceUtils;
 import io.lionweb.lioncore.java.model.impl.DynamicNode;
 
 public class Writer extends DynamicNode {
@@ -20,15 +21,15 @@ public class Writer extends DynamicNode {
   }
 
   public void setName(String name) {
-    this.setPropertyValue(getConcept().getPropertyByName("name"), name);
+    this.setPropertyValue(getClassifier().getPropertyByName("name"), name);
   }
 
   public String getName() {
-    return (String) this.getPropertyValueByName("name");
+    return (String) ClassifierInstanceUtils.getPropertyValueByName(this, "name");
   }
 
   @Override
-  public Concept getConcept() {
+  public Concept getClassifier() {
     return LibraryLanguage.WRITER;
   }
 }

@@ -5,17 +5,23 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import io.lionweb.lioncore.java.language.*;
 import io.lionweb.lioncore.java.language.Enumeration;
-import io.lionweb.lioncore.java.model.impl.DynamicEnumerationValue;
+import io.lionweb.lioncore.java.model.impl.EnumerationValue;
+import io.lionweb.lioncore.java.model.impl.EnumerationValueImpl;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.*;
+import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
- * This class is responsible for serialization and unserializing primitive values, based on the type
+ * This class is responsible for serialization and deserializing primitive values, based on the type
  * of the primitive value.
  */
 public class PrimitiveValuesSerialization {
   // We use the ID, and not the key, to classify the enumerations internally within
-  // PrimitiveValuesSerialization
-  // because that is unique
+  // PrimitiveValuesSerialization because that is unique. In two versions of the language we may
+  // have two PrimitiveTypes with the same key, that are different.
   private final Map<String, Enumeration> enumerationsByID = new HashMap<>();
   private boolean dynamicNodesEnabled = false;
 
@@ -33,19 +39,26 @@ public class PrimitiveValuesSerialization {
     String serialize(V value);
   }
 
-  public interface PrimitiveUnserializer<V> {
-    V unserialize(String serializedValue);
+  public interface PrimitiveDeserializer<V> {
+    V deserialize(String serializedValue);
+
+    default V deserialize(String serializedValue, boolean isRequired) {
+      return deserialize(serializedValue);
+    }
   }
 
-  public interface PrimitiveValueSerializerAndUnserializer<V>
-      extends PrimitiveSerializer<V>, PrimitiveUnserializer<V> {}
+  public interface PrimitiveValueSerializerAndDeserializer<V>
+      extends PrimitiveSerializer<V>, PrimitiveDeserializer<V> {}
 
-  private final Map<String, PrimitiveUnserializer<?>> primitiveUnserializers = new HashMap<>();
+  /** Indexed by ID */
+  private final Map<String, PrimitiveDeserializer<?>> primitiveDeserializers = new HashMap<>();
+
+  /** Indexed by ID */
   private final Map<String, PrimitiveSerializer<?>> primitiveSerializers = new HashMap<>();
 
-  public PrimitiveValuesSerialization registerUnserializer(
-      String dataTypeID, PrimitiveUnserializer<?> unserializer) {
-    this.primitiveUnserializers.put(dataTypeID, unserializer);
+  public PrimitiveValuesSerialization registerDeserializer(
+      String dataTypeID, PrimitiveDeserializer<?> deserializer) {
+    this.primitiveDeserializers.put(dataTypeID, deserializer);
     return this;
   }
 
@@ -55,21 +68,37 @@ public class PrimitiveValuesSerialization {
     return this;
   }
 
-  public void registerLionBuiltinsPrimitiveSerializersAndUnserializers() {
-    primitiveUnserializers.put(LionCoreBuiltins.getBoolean().getID(), Boolean::parseBoolean);
-    primitiveUnserializers.put(LionCoreBuiltins.getString().getID(), s -> s);
-    primitiveUnserializers.put(
+  public void registerLionBuiltinsPrimitiveSerializersAndDeserializers() {
+    primitiveDeserializers.put(
+        LionCoreBuiltins.getBoolean().getID(),
+        new PrimitiveDeserializer<Boolean>() {
+
+          @Override
+          public Boolean deserialize(String serializedValue) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public Boolean deserialize(String serializedValue, boolean isRequired) {
+            if (!isRequired && serializedValue == null) {
+              return null;
+            }
+            return Boolean.parseBoolean(serializedValue);
+          }
+        });
+    primitiveDeserializers.put(LionCoreBuiltins.getString().getID(), s -> s);
+    primitiveDeserializers.put(
         LionCoreBuiltins.getJSON().getID(),
-        (PrimitiveUnserializer<JsonElement>)
+        (PrimitiveDeserializer<JsonElement>)
             serializedValue -> {
               if (serializedValue == null) {
                 return null;
               }
               return JsonParser.parseString(serializedValue);
             });
-    primitiveUnserializers.put(
+    primitiveDeserializers.put(
         LionCoreBuiltins.getInteger().getID(),
-        (PrimitiveUnserializer<Integer>)
+        (PrimitiveDeserializer<Integer>)
             serializedValue -> {
               if (serializedValue == null) {
                 return null;
@@ -90,37 +119,34 @@ public class PrimitiveValuesSerialization {
         (PrimitiveSerializer<Integer>) value -> value.toString());
   }
 
-  public Object unserialize(DataType dataType, String serializedValue) {
+  public Object deserialize(DataType dataType, String serializedValue, boolean isRequired) {
     String dataTypeID = dataType.getID();
-    if (primitiveUnserializers.containsKey(dataTypeID)) {
-      return primitiveUnserializers.get(dataTypeID).unserialize(serializedValue);
-    } else if (enumerationsByID.containsKey(dataTypeID)) {
+    if (primitiveDeserializers.containsKey(dataTypeID)) {
+      return primitiveDeserializers.get(dataTypeID).deserialize(serializedValue, isRequired);
+    } else if (enumerationsByID.containsKey(dataTypeID) && dynamicNodesEnabled) {
       if (serializedValue == null) {
         return null;
       }
-      // In this case, where we are dealing with primitive values, we want to use the literal _key_
-      // (and not the ID)
+      // While we map types by IDs, we map literals by key.
       // This is at least the default behavior, but the user can register specialized
-      // primitiveUnserializers,
-      // if a different behavior is needed
+      // primitiveDeserializers, if a different behavior is needed
       Optional<EnumerationLiteral> enumerationLiteral =
           enumerationsByID.get(dataTypeID).getLiterals().stream()
               .filter(l -> Objects.equals(l.getKey(), serializedValue))
               .findFirst();
       if (enumerationLiteral.isPresent()) {
-        return enumerationLiteral.get();
+        return new EnumerationValueImpl(enumerationLiteral.get());
       } else {
         throw new RuntimeException("Invalid enumeration literal value: " + serializedValue);
       }
-    } else if (dynamicNodesEnabled && dataType instanceof Enumeration) {
-      return new DynamicEnumerationValue((Enumeration) dataType, serializedValue);
     } else {
       throw new IllegalArgumentException(
-          "Unable to unserialize primitive values of type " + dataTypeID);
+          "Unable to deserialize primitive values of type " + dataType);
     }
   }
 
-  public String serialize(String primitiveTypeID, Object value) {
+  public String serialize(@Nonnull String primitiveTypeID, @Nullable Object value) {
+    Objects.requireNonNull(primitiveTypeID, "The primitiveTypeID should not be null");
     if (primitiveSerializers.containsKey(primitiveTypeID)) {
       return ((PrimitiveSerializer<Object>) primitiveSerializers.get(primitiveTypeID))
           .serialize(value);
@@ -129,11 +155,31 @@ public class PrimitiveValuesSerialization {
         return null;
       }
       // In this case, where we are dealing with primitive values, we want to use the literal _key_
-      // (and not the ID)
+      // (and not the ID).
       // This is at least the default behavior, but the user can register specialized
-      // primitiveSerializers,
-      // if a different behavior is needed
-      return ((EnumerationLiteral) value).getKey();
+      // primitiveSerializers, if a different behavior is needed
+      if (value instanceof EnumerationValue) {
+        EnumerationLiteral enumerationLiteral = ((EnumerationValue) value).getEnumerationLiteral();
+        return enumerationLiteral.getKey();
+      } else if (value instanceof Enum<?>) {
+        Enumeration enumeration = enumerationsByID.get(primitiveTypeID);
+        if (enumeration == null) {
+          throw new RuntimeException(
+              "Cannot find enumeration with id "
+                  + primitiveTypeID
+                  + " while serializing primitive value "
+                  + value);
+        }
+        return PrimitiveValuesSerialization.<Enum>serializerFor(
+                (Class<Enum>) value.getClass(), enumeration)
+            .serialize((Enum) value);
+      } else {
+        throw new IllegalStateException(
+            "The primitive value with primitiveTypeID "
+                + primitiveTypeID
+                + " was expected to be an EnumerationValue or an instance of Enum. Instead it is: "
+                + value);
+      }
     } else {
       throw new IllegalArgumentException(
           "Unable to serialize primitive values of type "
@@ -144,7 +190,74 @@ public class PrimitiveValuesSerialization {
     }
   }
 
+  /** Please note that this will require support for reflection. */
+  public <E extends Enum<E>> void registerEnumClass(Class<E> enumClass, Enumeration enumeration) {
+    primitiveSerializers.put(enumeration.getID(), serializerFor(enumClass, enumeration));
+    primitiveDeserializers.put(enumeration.getID(), deserializerFor(enumClass, enumeration));
+  }
+
   private boolean isEnum(String primitiveTypeID) {
     return enumerationsByID.containsKey(primitiveTypeID);
+  }
+
+  public static <E extends Enum<E>> PrimitiveSerializer<E> serializerFor(
+      Class<E> enumClass, Enumeration enumeration) {
+    return value -> {
+      String enumerationLiteralName = value.name();
+      Optional<EnumerationLiteral> enumerationLiteral =
+          enumeration.getLiterals().stream()
+              .filter(l -> l.getName().equals(enumerationLiteralName))
+              .findFirst();
+      if (!enumerationLiteral.isPresent()) {
+        throw new IllegalArgumentException(
+            "Cannot serialize enum instance with name "
+                + enumerationLiteralName
+                + " as we cannot find an enumeration literal with the same name when considering enumeration "
+                + enumeration
+                + ". Literals available are: "
+                + enumeration.getLiterals().stream()
+                    .map(l -> l.getName())
+                    .collect(Collectors.joining(", ")));
+      }
+      return enumerationLiteral.get().getKey();
+    };
+  }
+
+  /** Please note that this will require support for reflection. */
+  public static <E extends Enum<E>> PrimitiveDeserializer<E> deserializerFor(
+      Class<E> enumClass, Enumeration enumeration) {
+    return serializedValue -> {
+      Optional<EnumerationLiteral> matchingEnumerationLiteral =
+          enumeration.getLiterals().stream()
+              .filter(l -> l.getKey().equals(serializedValue))
+              .findFirst();
+      if (!matchingEnumerationLiteral.isPresent()) {
+        throw new IllegalArgumentException(
+            "Cannot deserialize value "
+                + serializedValue
+                + " as we cannot find an enumeration literal with the same key when considering enumeration "
+                + enumeration
+                + ". Literals available are: "
+                + enumeration.getLiterals().stream()
+                    .map(l -> l.getKey())
+                    .collect(Collectors.joining(", ")));
+      }
+      Optional<Method> valueOf =
+          Arrays.stream(enumClass.getDeclaredMethods())
+              .filter(m -> m.getName().equals("valueOf") && m.getParameterCount() == 1)
+              .findFirst();
+      if (!valueOf.isPresent()) {
+        throw new IllegalStateException(
+            "Cannot find method valueOf(String) for class " + enumClass);
+      }
+      String literalName = matchingEnumerationLiteral.get().getName();
+      try {
+        E instance = (E) valueOf.get().invoke(null, literalName);
+        return instance;
+      } catch (IllegalAccessException | InvocationTargetException e) {
+        throw new RuntimeException(
+            "Issue while invoking valueOf on class " + enumClass + " with value " + literalName, e);
+      }
+    };
   }
 }

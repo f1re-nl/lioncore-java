@@ -3,6 +3,7 @@ package io.lionweb.lioncore.java.language;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+import io.lionweb.lioncore.java.model.ClassifierInstanceUtils;
 import io.lionweb.lioncore.java.model.ReferenceValue;
 import io.lionweb.lioncore.java.self.LionCore;
 import java.util.Arrays;
@@ -34,13 +35,15 @@ public class AnnotationTest extends BaseTest {
     Annotation annotation = new Annotation(language, "MyAnnotation");
     assertEquals(
         Arrays.asList(),
-        annotation.getReferredNodes(LionCore.getAnnotation().getReferenceByName("annotates")));
+        ClassifierInstanceUtils.getReferredNodes(
+            annotation, LionCore.getAnnotation().getReferenceByName("annotates")));
 
     Concept myConcept = new Concept(language, "myc");
     annotation.setAnnotates(myConcept);
     assertEquals(
         Arrays.asList(myConcept),
-        annotation.getReferredNodes(LionCore.getAnnotation().getReferenceByName("annotates")));
+        ClassifierInstanceUtils.getReferredNodes(
+            annotation, LionCore.getAnnotation().getReferenceByName("annotates")));
   }
 
   @Test
@@ -68,17 +71,6 @@ public class AnnotationTest extends BaseTest {
     assertEquals(
         Arrays.asList(property),
         annotation.getChildren(LionCore.getAnnotation().getContainmentByName("features")));
-  }
-
-  @Test
-  public void isMultiple() {
-    Language language = new Language();
-    Annotation annotation = new Annotation(language, "MyAnnotation");
-    assertEquals(false, annotation.isMultiple());
-    annotation.setMultiple(true);
-    assertEquals(true, annotation.isMultiple());
-    annotation.setMultiple(false);
-    assertEquals(false, annotation.isMultiple());
   }
 
   @Test
@@ -121,7 +113,8 @@ public class AnnotationTest extends BaseTest {
     assertLanguageIsNotValid(language);
 
     annotation.setExtendedAnnotation(superAnnotation);
-    assertEquals(myConcept, annotation.getAnnotates());
+    assertEquals(null, annotation.getAnnotates());
+    assertEquals(myConcept, annotation.getEffectivelyAnnotated());
     assertNodeTreeIsValid(annotation);
     assertLanguageIsValid(language);
   }

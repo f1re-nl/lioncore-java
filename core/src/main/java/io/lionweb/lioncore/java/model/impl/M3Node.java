@@ -1,11 +1,9 @@
 package io.lionweb.lioncore.java.model.impl;
 
-import io.lionweb.lioncore.java.language.Annotation;
+import io.lionweb.lioncore.java.language.Concept;
 import io.lionweb.lioncore.java.language.Containment;
 import io.lionweb.lioncore.java.language.Property;
 import io.lionweb.lioncore.java.language.Reference;
-import io.lionweb.lioncore.java.model.AnnotationInstance;
-import io.lionweb.lioncore.java.model.Model;
 import io.lionweb.lioncore.java.model.Node;
 import io.lionweb.lioncore.java.model.ReferenceValue;
 import java.util.*;
@@ -21,7 +19,8 @@ import javax.annotation.Nullable;
  * to be used by other implementation and it should be as reusable, basic, and unopinionated as
  * possible.
  */
-public abstract class M3Node<T extends M3Node> implements Node {
+public abstract class M3Node<T extends M3Node> extends AbstractClassifierInstance<Concept>
+    implements Node {
   private String id;
   private Node parent;
 
@@ -33,8 +32,6 @@ public abstract class M3Node<T extends M3Node> implements Node {
   private final Map<String, List<Node>> containmentValues = new HashMap<>();
   private final Map<String, List<ReferenceValue>> referenceValues = new HashMap<>();
 
-  private final List<AnnotationInstance> annotationInstances = new LinkedList<>();
-
   public T setID(String id) {
     this.id = id;
     return (T) this;
@@ -43,11 +40,6 @@ public abstract class M3Node<T extends M3Node> implements Node {
   public T setParent(Node parent) {
     this.parent = parent;
     return (T) this;
-  }
-
-  @Override
-  public Model getModel() {
-    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -64,31 +56,13 @@ public abstract class M3Node<T extends M3Node> implements Node {
   }
 
   @Override
-  public List<AnnotationInstance> getAnnotations() {
-    return this.annotationInstances;
-  }
-
-  @Override
   public Containment getContainmentFeature() {
     throw new UnsupportedOperationException();
   }
 
-  @Nonnull
-  @Override
-  public List<AnnotationInstance> getAnnotations(Annotation annotation) {
-    return annotationInstances.stream()
-        .filter(a -> a.getAnnotationDefinition() == annotation)
-        .collect(Collectors.toList());
-  }
-
-  @Override
-  public void addAnnotation(AnnotationInstance instance) {
-    annotationInstances.add(instance);
-  }
-
   @Override
   public Object getPropertyValue(Property property) {
-    if (!getConcept().allProperties().contains(property)) {
+    if (!getClassifier().allProperties().contains(property)) {
       throw new IllegalArgumentException("Property not belonging to this concept: " + property);
     }
     return propertyValues.get(property.getName());
@@ -113,7 +87,7 @@ public abstract class M3Node<T extends M3Node> implements Node {
 
   @Override
   public void setPropertyValue(Property property, Object value) {
-    if (!getConcept().allProperties().contains(property)) {
+    if (!getClassifier().allProperties().contains(property)) {
       throw new IllegalArgumentException("Property not belonging to this concept");
     }
     setPropertyValue(property.getName(), value);
@@ -124,17 +98,8 @@ public abstract class M3Node<T extends M3Node> implements Node {
   }
 
   @Override
-  public List<Node> getChildren() {
-    List<Node> allChildren = new LinkedList<>();
-    getConcept().allContainments().stream()
-        .map(c -> getChildren(c))
-        .forEach(children -> allChildren.addAll(children));
-    return allChildren;
-  }
-
-  @Override
   public List<Node> getChildren(Containment containment) {
-    if (!getConcept().allContainments().contains(containment)) {
+    if (!getClassifier().allContainments().contains(containment)) {
       throw new IllegalArgumentException("Containment not belonging to this concept");
     }
     return containmentValues.getOrDefault(containment.getName(), Collections.emptyList());
@@ -156,17 +121,9 @@ public abstract class M3Node<T extends M3Node> implements Node {
 
   @Nonnull
   @Override
-  public List<Node> getReferredNodes(@Nonnull Reference reference) {
-    return getReferenceValues(reference).stream()
-        .map(v -> v.getReferred())
-        .collect(Collectors.toList());
-  }
-
-  @Nonnull
-  @Override
   public List<ReferenceValue> getReferenceValues(@Nonnull Reference reference) {
     Objects.requireNonNull(reference, "reference should not be null");
-    if (!getConcept().allReferences().contains(reference)) {
+    if (!getClassifier().allReferences().contains(reference)) {
       throw new IllegalArgumentException("Reference not belonging to this concept");
     }
     return referenceValues.getOrDefault(reference.getName(), Collections.emptyList());
@@ -176,7 +133,7 @@ public abstract class M3Node<T extends M3Node> implements Node {
   public void addReferenceValue(
       @Nonnull Reference reference, @Nullable ReferenceValue referenceValue) {
     Objects.requireNonNull(reference, "reference should not be null");
-    if (!getConcept().allReferences().contains(reference)) {
+    if (!getClassifier().allReferences().contains(reference)) {
       throw new IllegalArgumentException("Reference not belonging to this concept: " + reference);
     }
     if (reference.isMultiple()) {
@@ -184,6 +141,16 @@ public abstract class M3Node<T extends M3Node> implements Node {
     } else {
       setReferenceSingleValue(reference.getName(), referenceValue);
     }
+  }
+
+  @Override
+  public void setReferenceValues(
+      @Nonnull Reference reference, @Nonnull List<? extends ReferenceValue> values) {
+    Objects.requireNonNull(reference, "reference should not be null");
+    if (!getClassifier().allReferences().contains(reference)) {
+      throw new IllegalArgumentException("Reference not belonging to this concept");
+    }
+    referenceValues.put(reference.getName(), (List<ReferenceValue>) values);
   }
 
   @Nullable

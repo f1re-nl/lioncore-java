@@ -6,3 +6,10 @@ build
 .idea
 **/bin/
 **/.DS_Store
+
+# Ignore IntelliJ project files (from MPS debugging)
+**/*.iml
+
+# Ignore Eclipse project files
+.settings
+.java-version

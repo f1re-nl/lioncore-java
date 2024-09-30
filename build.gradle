@@ -2,6 +2,7 @@ plugins {
     id "com.diffplug.spotless" version "5.1.0"
     id "java"
     id 'net.researchgate.release' version '3.0.2'
+    id("com.vanniktech.maven.publish") version "0.29.0" apply false
 }
 
 repositories {
@@ -13,12 +14,16 @@ subprojects {
     spotless {
         java {
             googleJavaFormat()
+            targetExclude ("**/src-gen/**", "**/build/**")
         }
     }
 }
 
 release {
-    buildTasks = [':core:publish', ":emf:publish"]
+    buildTasks = [":core:publishAllPublicationsToMavenCentralRepository",
+                  ":extensions:publishAllPublicationsToMavenCentralRepository",
+                  ":emf:publishAllPublicationsToMavenCentralRepository",
+                  ":emf-builtins:publishAllPublicationsToMavenCentralRepository"]
     versionPropertyFile = './gradle.properties'
     git {
         requireBranch.set('master')
@@ -27,7 +32,7 @@ release {
 }
 
 tasks.wrapper {
-    gradleVersion = "8.1.1"
+    gradleVersion = "8.5"
     // You can either download the binary-only version of Gradle (BIN) or
     // the full version (with sources and documentation) of Gradle (ALL)
     distributionType = Wrapper.DistributionType.ALL

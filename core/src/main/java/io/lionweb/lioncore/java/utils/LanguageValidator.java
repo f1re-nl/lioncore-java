@@ -162,8 +162,14 @@ public class LanguageValidator extends Validator<Language> {
 
   private void checkAnnotates(Annotation annotation, ValidationResult validationResult) {
     validationResult.checkForError(
-        annotation.getAnnotates() == null,
+        annotation.getEffectivelyAnnotated() == null,
         "An annotation should specify annotates or inherit it",
+        annotation);
+    validationResult.checkForError(
+        annotation.getExtendedAnnotation() != null
+            && annotation.getAnnotates() != null
+            && annotation.getAnnotates() != annotation.getExtendedAnnotation().getAnnotates(),
+        "When a sub annotation specify a value for annotates it must be the same value the super annotation specifies",
         annotation);
   }
 
